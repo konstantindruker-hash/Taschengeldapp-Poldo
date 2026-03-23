@@ -99,7 +99,9 @@ const entryList = document.getElementById("entryList");
 const emptyState = document.getElementById("emptyState");
 const balanceValue = document.getElementById("balanceValue");
 const incomeValue = document.getElementById("incomeValue");
+const interestValue = document.getElementById("interestValue");
 const expenseValue = document.getElementById("expenseValue");
+const incomeIsInterest = document.getElementById("incomeIsInterest");
 
 const entryModal = document.getElementById("entryModal");
 const closeEntryModal = document.getElementById("closeEntryModal");
@@ -110,6 +112,8 @@ const editEntryAmount = document.getElementById("editEntryAmount");
 const editEntryCurrency = document.getElementById("editEntryCurrency");
 const editEntryDate = document.getElementById("editEntryDate");
 const editEntryNote = document.getElementById("editEntryNote");
+const editEntryIsInterest = document.getElementById("editEntryIsInterest");
+const editInterestRow = document.getElementById("editInterestRow");
 const deleteEntryButton = document.getElementById("deleteEntryButton");
 
 const today = new Date().toISOString().slice(0, 10);
@@ -326,13 +330,16 @@ function calculateTotals() {
       const baseAmount = Number(convertToBase(entry.amount, entryCurrency));
       if (entry.type === "income") {
         totals.income += baseAmount;
+        if (entry.isInterest) {
+          totals.interest += baseAmount;
+        }
       } else {
         totals.expense += baseAmount;
       }
       totals.balance = totals.income - totals.expense;
       return totals;
     },
-    { income: 0, expense: 0, balance: 0 }
+    { income: 0, interest: 0, expense: 0, balance: 0 }
   );
 }
 
@@ -340,6 +347,7 @@ function renderTotals() {
   const totals = calculateTotals();
   balanceValue.textContent = formatCurrency(totals.balance);
   incomeValue.textContent = formatCurrency(totals.income);
+  interestValue.textContent = formatCurrency(totals.interest);
   expenseValue.textContent = formatCurrency(totals.expense);
 }
 
@@ -362,6 +370,7 @@ function renderEntries() {
       const entryCurrency = entry.currency || state.baseCurrency;
       const originalAmount = `${Number(entry.amount).toFixed(2)} ${entryCurrency}`;
       const baseAmount = formatCurrency(convertToBase(entry.amount, entryCurrency));
+      const interestText = entry.type === "income" && entry.isInterest ? '<span class="entry-subline">Davon Zinsen</span>' : "";
 
       return `
         <li class="entry-item ${entry.type}">
@@ -370,6 +379,7 @@ function renderEntries() {
             <strong>${entry.note}</strong>
             <span>${label} am ${formatDate(entry.date)}</span>
             <span class="entry-subline">Original: ${originalAmount}</span>
+            ${interestText}
           </div>
           <div class="entry-actions">
             <strong class="entry-amount ${amountClass}">${sign}${baseAmount}</strong>
@@ -397,7 +407,7 @@ function updateRateHint() {
   rateHint.textContent = `Direkter Kurs: 1 Fremdwaehrung = X ${state.baseCurrency}. Kehrwert: 1 ${state.baseCurrency} = X Fremdwaehrung.`;
 }
 
-function addEntry(type, amount, currency, date, note) {
+function addEntry(type, amount, currency, date, note, isInterest = false) {
   const normalizedAmount = Number(amount);
   const normalizedCurrency = currency || state.baseCurrency;
   if (!normalizedAmount || normalizedAmount < 0) {
@@ -411,6 +421,7 @@ function addEntry(type, amount, currency, date, note) {
     currency: normalizedCurrency,
     date,
     createdAt: new Date().toISOString(),
+    isInterest: type === "income" ? Boolean(isInterest) : false,
     note: note.trim() || (type === "income" ? "Taschengeld" : "Ausgabe")
   });
 
@@ -498,6 +509,8 @@ function startEditingEntry(entryId) {
   editEntryCurrency.value = entry.currency || state.baseCurrency;
   editEntryDate.value = entry.date;
   editEntryNote.value = entry.note;
+  editEntryIsInterest.checked = Boolean(entry.isInterest);
+  editInterestRow.hidden = entry.type !== "income";
   openModal(entryModal);
 }
 
@@ -511,6 +524,7 @@ function updateEntry(entryId, nextValues) {
   entry.amount = Number(nextValues.amount);
   entry.currency = nextValues.currency;
   entry.date = nextValues.date;
+  entry.isInterest = nextValues.type === "income" ? Boolean(nextValues.isInterest) : false;
   entry.note = nextValues.note;
 }
 
@@ -621,7 +635,14 @@ cancelEditButton.addEventListener("click", resetCurrencyForm);
 
 incomeForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  addEntry("income", incomeForm.amount.value, incomeForm.currency.value, incomeForm.date.value, incomeForm.note.value);
+  addEntry(
+    "income",
+    incomeForm.amount.value,
+    incomeForm.currency.value,
+    incomeForm.date.value,
+    incomeForm.note.value,
+    incomeIsInterest.checked
+  );
   incomeForm.reset();
   document.getElementById("incomeDate").value = today;
   incomeCurrency.value = state.baseCurrency;
@@ -663,11 +684,19 @@ entryEditForm.addEventListener("submit", (event) => {
     amount: editEntryAmount.value,
     currency: editEntryCurrency.value,
     date: editEntryDate.value,
+    isInterest: editEntryIsInterest.checked,
     note: editEntryNote.value.trim() || (editEntryType.value === "income" ? "Taschengeld" : "Ausgabe")
   });
   saveState();
   render();
   closeModal(entryModal);
+});
+
+editEntryType.addEventListener("change", () => {
+  editInterestRow.hidden = editEntryType.value !== "income";
+  if (editEntryType.value !== "income") {
+    editEntryIsInterest.checked = false;
+  }
 });
 
 deleteEntryButton.addEventListener("click", () => {

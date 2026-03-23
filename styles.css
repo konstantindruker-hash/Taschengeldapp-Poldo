@@ -190,7 +190,7 @@ h2 {
 
 .balance-stats {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -235,6 +235,23 @@ form label {
   gap: 8px;
   margin-bottom: 14px;
   font-size: 0.96rem;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkbox-row input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+}
+
+.checkbox-row span {
+  color: var(--text);
 }
 
 input,
@@ -422,5 +439,11 @@ button:hover {
 
   .modal-symbol-grid {
     grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 719px) {
+  .balance-stats {
+    grid-template-columns: 1fr;
   }
 }

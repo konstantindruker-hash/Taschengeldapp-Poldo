@@ -52,6 +52,10 @@
           <strong id="incomeValue">0,00 EUR</strong>
         </article>
         <article>
+          <span>Bisherige Zinsen</span>
+          <strong id="interestValue">0,00 EUR</strong>
+        </article>
+        <article>
           <span>Ausgaben</span>
           <strong id="expenseValue">0,00 EUR</strong>
         </article>
@@ -76,6 +80,10 @@
         <label>
           Notiz
           <input id="incomeNote" name="note" type="text" maxlength="50" placeholder="z. B. Wochen-Taschengeld">
+        </label>
+        <label class="checkbox-row">
+          <input id="incomeIsInterest" name="isInterest" type="checkbox">
+          <span>Diese Einnahme sind Zinsen</span>
         </label>
         <button type="submit" class="primary-btn">Hinzufuegen</button>
       </form>
@@ -224,6 +232,10 @@
         <label>
           Notiz
           <input id="editEntryNote" type="text" maxlength="50" required>
+        </label>
+        <label class="checkbox-row" id="editInterestRow">
+          <input id="editEntryIsInterest" type="checkbox">
+          <span>Diese Einnahme sind Zinsen</span>
         </label>
         <div class="form-actions">
           <button type="submit" class="ghost-btn wide-btn">Aenderungen speichern</button>
