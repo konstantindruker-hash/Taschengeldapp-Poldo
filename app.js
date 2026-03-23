@@ -199,6 +199,21 @@ function formatDate(dateValue) {
   return `${day}.${month}.${year}`;
 }
 
+function getSortedEntries() {
+  return [...state.entries].sort((left, right) => {
+    const leftDate = left.date || "";
+    const rightDate = right.date || "";
+
+    if (leftDate !== rightDate) {
+      return rightDate.localeCompare(leftDate);
+    }
+
+    const leftCreated = left.createdAt || "";
+    const rightCreated = right.createdAt || "";
+    return rightCreated.localeCompare(leftCreated);
+  });
+}
+
 function openModal(modal) {
   modal.classList.remove("hidden");
   modal.setAttribute("aria-hidden", "false");
@@ -329,14 +344,16 @@ function renderTotals() {
 }
 
 function renderEntries() {
-  if (state.entries.length === 0) {
+  const sortedEntries = getSortedEntries();
+
+  if (sortedEntries.length === 0) {
     entryList.innerHTML = "";
     emptyState.hidden = false;
     return;
   }
 
   emptyState.hidden = true;
-  entryList.innerHTML = state.entries
+  entryList.innerHTML = sortedEntries
     .map((entry) => {
       const icon = entry.type === "income" ? "↓" : "↑";
       const sign = entry.type === "income" ? "+" : "-";
@@ -393,6 +410,7 @@ function addEntry(type, amount, currency, date, note) {
     amount: normalizedAmount,
     currency: normalizedCurrency,
     date,
+    createdAt: new Date().toISOString(),
     note: note.trim() || (type === "income" ? "Taschengeld" : "Ausgabe")
   });
 
