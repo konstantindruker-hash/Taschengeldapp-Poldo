@@ -205,12 +205,12 @@ function getSortedEntries() {
     const rightDate = right.date || "";
 
     if (leftDate !== rightDate) {
-      return rightDate.localeCompare(leftDate);
+      return leftDate.localeCompare(rightDate);
     }
 
     const leftCreated = left.createdAt || "";
     const rightCreated = right.createdAt || "";
-    return rightCreated.localeCompare(leftCreated);
+    return leftCreated.localeCompare(rightCreated);
   });
 }
 
