@@ -7,5 +7,12 @@
   "theme_color": "#f7efe2",
   "lang": "de-DE",
   "description": "Ein einfacher Taschengeld-Tracker fuer Kinder.",
-  "icons": []
+  "icons": [
+    {
+      "src": "icon-money.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
 }
