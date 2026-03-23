@@ -209,12 +209,12 @@ function getSortedEntries() {
     const rightDate = right.date || "";
 
     if (leftDate !== rightDate) {
-      return leftDate.localeCompare(rightDate);
+      return rightDate.localeCompare(leftDate);
     }
 
     const leftCreated = left.createdAt || "";
     const rightCreated = right.createdAt || "";
-    return leftCreated.localeCompare(rightCreated);
+    return rightCreated.localeCompare(leftCreated);
   });
 }
 
