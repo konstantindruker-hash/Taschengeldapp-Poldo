@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f7efe2">
+  <title>Polds Taschengeld</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="hero-card">
+      <div class="hero-copy">
+        <p class="eyebrow">Taschengeld-Tracker</p>
+        <h1>Das kleine Konto fuer deinen Sohn</h1>
+        <p class="hero-text">
+          Taschengeld eintragen, Ausgaben festhalten und zusammen sehen, wie viel gerade noch da ist.
+        </p>
+      </div>
+
+      <div class="symbol-picker">
+        <div class="picker-heading">
+          <div class="picker-title-row">
+            <div>
+              <label for="symbolSelect">Symbol oder Tier</label>
+              <div class="picker-subtitle">Groesser, bunter und frei waehlbar</div>
+            </div>
+            <button id="openSymbolSettings" class="ghost-btn settings-button" type="button">Auswaehlen</button>
+          </div>
+        </div>
+        <select id="symbolSelect" class="hidden"></select>
+        <div class="symbol-preview" id="symbolPreview" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="balance-card">
+      <div class="balance-top">
+        <div>
+          <p class="balance-label">Aktuelles Guthaben</p>
+          <p class="balance-value" id="balanceValue">0,00 EUR</p>
+        </div>
+        <button id="openCurrencySettings" class="ghost-btn settings-button" type="button">Waehrungen</button>
+      </div>
+      <div class="balance-stats">
+        <article>
+          <span>Einnahmen</span>
+          <strong id="incomeValue">0,00 EUR</strong>
+        </article>
+        <article>
+          <span>Ausgaben</span>
+          <strong id="expenseValue">0,00 EUR</strong>
+        </article>
+      </div>
+    </section>
+
+    <section class="forms-grid">
+      <form class="entry-card" id="incomeForm">
+        <h2>Taschengeld hinzufuegen</h2>
+        <label>
+          Betrag
+          <input id="incomeAmount" name="amount" type="number" step="0.01" min="0" placeholder="z. B. 5.00" required>
+        </label>
+        <label>
+          Waehrung
+          <select id="incomeCurrency" name="currency"></select>
+        </label>
+        <label>
+          Wann?
+          <input id="incomeDate" name="date" type="date" required>
+        </label>
+        <label>
+          Notiz
+          <input id="incomeNote" name="note" type="text" maxlength="50" placeholder="z. B. Wochen-Taschengeld">
+        </label>
+        <button type="submit" class="primary-btn">Hinzufuegen</button>
+      </form>
+
+      <form class="entry-card" id="expenseForm">
+        <h2>Ausgabe eintragen</h2>
+        <label>
+          Betrag
+          <input id="expenseAmount" name="amount" type="number" step="0.01" min="0" placeholder="z. B. 2.50" required>
+        </label>
+        <label>
+          Waehrung
+          <select id="expenseCurrency" name="currency"></select>
+        </label>
+        <label>
+          Wann?
+          <input id="expenseDate" name="date" type="date" required>
+        </label>
+        <label>
+          Wofuer?
+          <input id="expenseNote" name="note" type="text" maxlength="50" placeholder="z. B. Wasser, Eis, Spielzeug">
+        </label>
+        <button type="submit" class="secondary-btn">Ausgabe speichern</button>
+      </form>
+    </section>
+
+    <section class="history-card">
+      <div class="history-header">
+        <div>
+          <p class="eyebrow">Verlauf</p>
+          <h2>Alle Eintraege</h2>
+        </div>
+      </div>
+      <ul id="entryList" class="entry-list"></ul>
+      <p id="emptyState" class="empty-state">Noch keine Eintraege. Trag das erste Taschengeld ein.</p>
+    </section>
+  </main>
+
+  <div id="symbolModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-close-symbol-modal="true"></div>
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="symbolModalTitle">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">Symbole</p>
+          <h2 id="symbolModalTitle">Tier oder Symbol auswaehlen</h2>
+        </div>
+        <button id="closeSymbolSettings" class="ghost-btn" type="button">Schliessen</button>
+      </div>
+      <div class="symbol-grid modal-symbol-grid" id="symbolGrid" aria-label="Symbol-Auswahl"></div>
+    </section>
+  </div>
+
+  <div id="currencyModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-close-modal="true"></div>
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="currencyModalTitle">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">Waehrungen</p>
+          <h2 id="currencyModalTitle">Grundwaehrung und eigene Kurse</h2>
+        </div>
+        <button id="closeCurrencySettings" class="ghost-btn" type="button">Schliessen</button>
+      </div>
+
+      <div class="settings-grid">
+        <form id="baseCurrencyForm" class="mini-card">
+          <label>
+            Grundwaehrung der App
+            <select id="baseCurrencySelect"></select>
+          </label>
+          <p class="helper-text">
+            Alle Eintraege werden in diese Waehrung umgerechnet.
+          </p>
+          <button type="submit" class="ghost-btn wide-btn">Grundwaehrung speichern</button>
+        </form>
+
+        <form id="currencyForm" class="mini-card">
+          <input id="editingCurrencyCode" type="hidden" value="">
+          <label>
+            Waehrungscode
+            <input id="currencyCodeInput" name="currencyCode" type="text" maxlength="8" placeholder="z. B. EUR oder GELD" required>
+          </label>
+          <label>
+            Name der Waehrung
+            <input id="currencyNameInput" name="currencyName" type="text" maxlength="30" placeholder="z. B. Euro" required>
+          </label>
+          <label>
+            Kurs zur Grundwaehrung
+            <input id="currencyRateInput" name="currencyRate" type="number" step="0.0001" min="0.0001" placeholder="z. B. 1.0000" required>
+          </label>
+          <label>
+            Oder Kehrwert eingeben
+            <input id="currencyInverseInput" name="currencyInverse" type="number" step="0.0001" min="0.0001" placeholder="z. B. 1.0870">
+          </label>
+          <p class="helper-text" id="rateHint">
+            Beispiel: 1 USD = 0.92 EUR
+          </p>
+          <div class="form-actions">
+            <button type="submit" class="ghost-btn wide-btn" id="saveCurrencyButton">Waehrung speichern</button>
+            <button type="button" class="ghost-btn wide-btn hidden" id="cancelEditButton">Bearbeiten abbrechen</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="mini-card">
+        <div class="rates-header">
+          <strong>Gespeicherte Waehrungen</strong>
+          <span id="baseCurrencyBadge">Basis: EUR</span>
+        </div>
+        <ul id="rateList" class="rate-list"></ul>
+      </div>
+    </section>
+  </div>
+
+  <div id="entryModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-close-entry-modal="true"></div>
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="entryModalTitle">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">Eintrag</p>
+          <h2 id="entryModalTitle">Eintrag bearbeiten</h2>
+        </div>
+        <button id="closeEntryModal" class="ghost-btn" type="button">Schliessen</button>
+      </div>
+
+      <form id="entryEditForm" class="mini-card">
+        <input id="editingEntryId" type="hidden" value="">
+        <label>
+          Typ
+          <select id="editEntryType" required>
+            <option value="income">Taschengeld</option>
+            <option value="expense">Ausgabe</option>
+          </select>
+        </label>
+        <label>
+          Betrag
+          <input id="editEntryAmount" type="number" step="0.01" min="0" required>
+        </label>
+        <label>
+          Waehrung
+          <select id="editEntryCurrency" required></select>
+        </label>
+        <label>
+          Datum
+          <input id="editEntryDate" type="date" required>
+        </label>
+        <label>
+          Notiz
+          <input id="editEntryNote" type="text" maxlength="50" required>
+        </label>
+        <div class="form-actions">
+          <button type="submit" class="ghost-btn wide-btn">Aenderungen speichern</button>
+          <button type="button" id="deleteEntryButton" class="ghost-btn wide-btn">Eintrag loeschen</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
