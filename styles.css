@@ -177,6 +177,13 @@ h2 {
   gap: 12px;
 }
 
+.top-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .balance-label {
   margin-bottom: 6px;
   color: var(--muted);
@@ -186,6 +193,12 @@ h2 {
   margin-bottom: 0;
   font-size: clamp(2rem, 8vw, 3.4rem);
   font-weight: 700;
+}
+
+.sync-status {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
 }
 
 .balance-stats {
@@ -255,6 +268,7 @@ form label {
 }
 
 input,
+textarea,
 select,
 button {
   width: 100%;
@@ -262,6 +276,15 @@ button {
   border-radius: 14px;
   padding: 13px 14px;
   background: #fffdf7;
+}
+
+.top-actions button {
+  width: auto;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 150px;
 }
 
 button {

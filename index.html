@@ -44,8 +44,12 @@
           <p class="balance-label">Aktuelles Guthaben</p>
           <p class="balance-value" id="balanceValue">0,00 EUR</p>
         </div>
-        <button id="openCurrencySettings" class="ghost-btn settings-button" type="button">Waehrungen</button>
+        <div class="top-actions">
+          <button id="openSyncSettings" class="ghost-btn settings-button" type="button">Sync</button>
+          <button id="openCurrencySettings" class="ghost-btn settings-button" type="button">Waehrungen</button>
+        </div>
       </div>
+      <p class="sync-status" id="syncStatus">Lokal auf diesem Geraet gespeichert</p>
       <div class="balance-stats">
         <article>
           <span>Einnahmen</span>
@@ -197,6 +201,37 @@
     </section>
   </div>
 
+  <div id="syncModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-close-sync-modal="true"></div>
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="syncModalTitle">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">Synchronisation</p>
+          <h2 id="syncModalTitle">Gemeinsame Eintraege mit Firebase</h2>
+        </div>
+        <button id="closeSyncSettings" class="ghost-btn" type="button">Schliessen</button>
+      </div>
+
+      <form id="syncForm" class="mini-card">
+        <label>
+          Gemeinsame Familien-ID
+          <input id="syncRoomId" type="text" maxlength="40" placeholder="z. B. familie-pold" required>
+        </label>
+        <label>
+          Firebase-Konfiguration als JSON
+          <textarea id="firebaseConfigInput" rows="8" placeholder='{"apiKey":"...","authDomain":"...","projectId":"..."}' required></textarea>
+        </label>
+        <p class="helper-text">
+          Alle Geraete mit derselben Familien-ID und derselben Firebase-Konfiguration sehen dieselben Eintraege.
+        </p>
+        <div class="form-actions">
+          <button type="submit" class="ghost-btn wide-btn">Synchronisation verbinden</button>
+          <button type="button" id="disconnectSyncButton" class="ghost-btn wide-btn">Zur lokalen Version wechseln</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
   <div id="entryModal" class="modal hidden" aria-hidden="true">
     <div class="modal-backdrop" data-close-entry-modal="true"></div>
     <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="entryModalTitle">
@@ -245,6 +280,6 @@
     </section>
   </div>
 
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
