@@ -4,6 +4,7 @@ import {
   collection,
   doc,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   onSnapshot
@@ -146,6 +147,7 @@ let firebaseApp = null;
 let firestoreDb = null;
 let firebaseAuth = null;
 let unsubscribeEntries = null;
+let unsubscribeSettings = null;
 let embeddedFirebaseConfig = null;
 
 function normalizeCode(code) {
@@ -463,6 +465,27 @@ function renderSyncInputs() {
   updateSyncStatus(isSyncEnabled() ? `Gemeinsam synchronisiert: ${syncState.roomId}` : "Lokal auf diesem Geraet gespeichert");
 }
 
+function getSharedSettingsPayload() {
+  return {
+    selectedSymbol: state.selectedSymbol,
+    baseCurrency: state.baseCurrency,
+    currencies: state.currencies,
+    exchangeRates: state.exchangeRates
+  };
+}
+
+async function saveSharedSettings() {
+  if (!isSyncEnabled()) {
+    return;
+  }
+
+  await setDoc(
+    doc(firestoreDb, "sharedBoards", syncState.boardKey, "meta", "settings"),
+    getSharedSettingsPayload(),
+    { merge: true }
+  );
+}
+
 function render() {
   ensureStateShape();
   renderCurrencyOptions();
@@ -482,6 +505,10 @@ async function disconnectFirebase() {
   if (unsubscribeEntries) {
     unsubscribeEntries();
     unsubscribeEntries = null;
+  }
+  if (unsubscribeSettings) {
+    unsubscribeSettings();
+    unsubscribeSettings = null;
   }
   if (firebaseApp) {
     await deleteApp(firebaseApp);
@@ -523,6 +550,28 @@ async function connectFirebase(config, boardKey) {
   firestoreDb = getFirestore(firebaseApp);
   firebaseAuth = getAuth(firebaseApp);
   await signInAnonymously(firebaseAuth);
+
+  unsubscribeSettings = onSnapshot(
+    doc(firestoreDb, "sharedBoards", boardKey, "meta", "settings"),
+    async (settingsDoc) => {
+      if (!settingsDoc.exists()) {
+        await setDoc(doc(firestoreDb, "sharedBoards", boardKey, "meta", "settings"), getSharedSettingsPayload());
+        return;
+      }
+
+      const settings = settingsDoc.data();
+      state.selectedSymbol = settings.selectedSymbol || state.selectedSymbol;
+      state.baseCurrency = settings.baseCurrency || state.baseCurrency;
+      state.currencies = Array.isArray(settings.currencies) && settings.currencies.length > 0 ? settings.currencies : state.currencies;
+      state.exchangeRates = settings.exchangeRates || state.exchangeRates;
+      ensureStateShape();
+      saveState();
+      render();
+    },
+    () => {
+      updateSyncStatus("Waehrungen konnten nicht synchronisiert werden");
+    }
+  );
 
   unsubscribeEntries = onSnapshot(
     collection(firestoreDb, "sharedBoards", boardKey, "entries"),
@@ -724,13 +773,14 @@ async function deleteEntry(entryId) {
   render();
 }
 
-symbolSelect.addEventListener("change", (event) => {
+symbolSelect.addEventListener("change", async (event) => {
   state.selectedSymbol = event.target.value;
   saveState();
+  await saveSharedSettings();
   render();
 });
 
-symbolGrid.addEventListener("click", (event) => {
+symbolGrid.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-symbol-id]");
   if (!button) {
     return;
@@ -738,6 +788,7 @@ symbolGrid.addEventListener("click", (event) => {
 
   state.selectedSymbol = button.dataset.symbolId;
   saveState();
+  await saveSharedSettings();
   render();
   closeModal(symbolModal);
 });
@@ -791,14 +842,15 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-baseCurrencyForm.addEventListener("submit", (event) => {
+baseCurrencyForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   rebuildRatesForNewBase(baseCurrencySelect.value);
   saveState();
+  await saveSharedSettings();
   render();
 });
 
-currencyForm.addEventListener("submit", (event) => {
+currencyForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const previousCode = normalizeCode(editingCurrencyCode.value);
   const code = normalizeCode(currencyCodeInput.value);
@@ -813,11 +865,12 @@ currencyForm.addEventListener("submit", (event) => {
 
   upsertCurrency(previousCode, code, name, rate);
   saveState();
+  await saveSharedSettings();
   render();
   resetCurrencyForm();
 });
 
-rateList.addEventListener("click", (event) => {
+rateList.addEventListener("click", async (event) => {
   const editButton = event.target.closest("[data-edit-currency]");
   if (editButton) {
     startEditingCurrency(editButton.dataset.editCurrency);
@@ -831,6 +884,7 @@ rateList.addEventListener("click", (event) => {
 
   deleteCurrency(deleteButton.dataset.deleteCurrency);
   saveState();
+  await saveSharedSettings();
   render();
 });
 
