@@ -6,9 +6,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
-  onSnapshot,
-  query,
-  orderBy
+  onSnapshot
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 
@@ -498,7 +496,7 @@ async function connectFirebase(config, roomId) {
   await signInAnonymously(firebaseAuth);
 
   unsubscribeEntries = onSnapshot(
-    query(collection(firestoreDb, "sharedBoards", roomId, "entries"), orderBy("date", "desc"), orderBy("createdAt", "desc")),
+    collection(firestoreDb, "sharedBoards", roomId, "entries"),
     (snapshot) => {
       state.entries = snapshot.docs.map((entryDoc) => ({
         id: entryDoc.id,
