@@ -1,4 +1,19 @@
+import { initializeApp, getApps, deleteApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  doc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  query,
+  orderBy
+} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+
 const STORAGE_KEY = "polds-taschengeld-data";
+const SYNC_KEY = "polds-taschengeld-sync";
 
 const symbols = [
   { id: "fox", name: "Fuchs", emoji: "🦊", text: "Der schlaue Fuchs passt auf das Geld auf." },
@@ -74,6 +89,15 @@ const symbolModal = document.getElementById("symbolModal");
 const openSymbolSettings = document.getElementById("openSymbolSettings");
 const closeSymbolSettings = document.getElementById("closeSymbolSettings");
 
+const openSyncSettings = document.getElementById("openSyncSettings");
+const closeSyncSettings = document.getElementById("closeSyncSettings");
+const syncModal = document.getElementById("syncModal");
+const syncForm = document.getElementById("syncForm");
+const syncRoomId = document.getElementById("syncRoomId");
+const firebaseConfigInput = document.getElementById("firebaseConfigInput");
+const disconnectSyncButton = document.getElementById("disconnectSyncButton");
+const syncStatus = document.getElementById("syncStatus");
+
 const openCurrencySettings = document.getElementById("openCurrencySettings");
 const closeCurrencySettings = document.getElementById("closeCurrencySettings");
 const currencyModal = document.getElementById("currencyModal");
@@ -120,6 +144,11 @@ const today = new Date().toISOString().slice(0, 10);
 document.getElementById("incomeDate").value = today;
 document.getElementById("expenseDate").value = today;
 
+let firebaseApp = null;
+let firestoreDb = null;
+let firebaseAuth = null;
+let unsubscribeEntries = null;
+
 function normalizeCode(code) {
   return code.trim().toUpperCase();
 }
@@ -155,10 +184,33 @@ function loadState() {
   }
 }
 
+function loadSyncSettings() {
+  try {
+    const raw = localStorage.getItem(SYNC_KEY);
+    if (!raw) {
+      return { enabled: false, roomId: "", configText: "" };
+    }
+
+    const parsed = JSON.parse(raw);
+    return {
+      enabled: Boolean(parsed.enabled),
+      roomId: parsed.roomId || "",
+      configText: parsed.configText || ""
+    };
+  } catch {
+    return { enabled: false, roomId: "", configText: "" };
+  }
+}
+
 let state = loadState();
+let syncState = loadSyncSettings();
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function saveSyncSettings() {
+  localStorage.setItem(SYNC_KEY, JSON.stringify(syncState));
 }
 
 function ensureStateShape() {
@@ -174,6 +226,14 @@ function ensureStateShape() {
 }
 
 ensureStateShape();
+
+function isSyncEnabled() {
+  return Boolean(syncState.enabled && firestoreDb && syncState.roomId);
+}
+
+function updateSyncStatus(text) {
+  syncStatus.textContent = text;
+}
 
 function isIntlCurrencyCodeSupported(code) {
   try {
@@ -393,6 +453,12 @@ function renderEntries() {
     .join("");
 }
 
+function renderSyncInputs() {
+  syncRoomId.value = syncState.roomId || "";
+  firebaseConfigInput.value = syncState.configText || "";
+  updateSyncStatus(isSyncEnabled() ? `Gemeinsam synchronisiert: ${syncState.roomId}` : "Lokal auf diesem Geraet gespeichert");
+}
+
 function render() {
   ensureStateShape();
   renderCurrencyOptions();
@@ -401,21 +467,87 @@ function render() {
   renderRateList();
   renderTotals();
   renderEntries();
+  renderSyncInputs();
 }
 
 function updateRateHint() {
   rateHint.textContent = `Direkter Kurs: 1 Fremdwaehrung = X ${state.baseCurrency}. Kehrwert: 1 ${state.baseCurrency} = X Fremdwaehrung.`;
 }
 
-function addEntry(type, amount, currency, date, note, isInterest = false) {
+async function disconnectFirebase() {
+  if (unsubscribeEntries) {
+    unsubscribeEntries();
+    unsubscribeEntries = null;
+  }
+  if (firebaseApp) {
+    await deleteApp(firebaseApp);
+    firebaseApp = null;
+    firestoreDb = null;
+    firebaseAuth = null;
+  }
+}
+
+async function connectFirebase(config, roomId) {
+  await disconnectFirebase();
+
+  const appName = `polds-${roomId}`;
+  const existing = getApps().find((app) => app.name === appName);
+  firebaseApp = existing || initializeApp(config, appName);
+  firestoreDb = getFirestore(firebaseApp);
+  firebaseAuth = getAuth(firebaseApp);
+  await signInAnonymously(firebaseAuth);
+
+  unsubscribeEntries = onSnapshot(
+    query(collection(firestoreDb, "sharedBoards", roomId, "entries"), orderBy("date", "desc"), orderBy("createdAt", "desc")),
+    (snapshot) => {
+      state.entries = snapshot.docs.map((entryDoc) => ({
+        id: entryDoc.id,
+        ...entryDoc.data()
+      }));
+      render();
+    },
+    () => {
+      updateSyncStatus("Synchronisation fehlgeschlagen, lokal weiter genutzt");
+    }
+  );
+}
+
+function getFirebaseConfigFromInput() {
+  const configText = firebaseConfigInput.value.trim();
+  if (!configText) {
+    throw new Error("missing config");
+  }
+  return JSON.parse(configText);
+}
+
+async function enableSync() {
+  const roomId = syncRoomId.value.trim();
+  const config = getFirebaseConfigFromInput();
+  await connectFirebase(config, roomId);
+  syncState = {
+    enabled: true,
+    roomId,
+    configText: firebaseConfigInput.value.trim()
+  };
+  saveSyncSettings();
+  updateSyncStatus(`Gemeinsam synchronisiert: ${roomId}`);
+}
+
+async function disableSync() {
+  await disconnectFirebase();
+  syncState.enabled = false;
+  saveSyncSettings();
+  updateSyncStatus("Lokal auf diesem Geraet gespeichert");
+}
+
+async function addEntry(type, amount, currency, date, note, isInterest = false) {
   const normalizedAmount = Number(amount);
   const normalizedCurrency = currency || state.baseCurrency;
   if (!normalizedAmount || normalizedAmount < 0) {
     return;
   }
 
-  state.entries.unshift({
-    id: crypto.randomUUID(),
+  const payload = {
     type,
     amount: normalizedAmount,
     currency: normalizedCurrency,
@@ -423,6 +555,16 @@ function addEntry(type, amount, currency, date, note, isInterest = false) {
     createdAt: new Date().toISOString(),
     isInterest: type === "income" ? Boolean(isInterest) : false,
     note: note.trim() || (type === "income" ? "Taschengeld" : "Ausgabe")
+  };
+
+  if (isSyncEnabled()) {
+    await addDoc(collection(firestoreDb, "sharedBoards", syncState.roomId, "entries"), payload);
+    return;
+  }
+
+  state.entries.unshift({
+    id: crypto.randomUUID(),
+    ...payload
   });
 
   saveState();
@@ -514,7 +656,19 @@ function startEditingEntry(entryId) {
   openModal(entryModal);
 }
 
-function updateEntry(entryId, nextValues) {
+async function updateEntry(entryId, nextValues) {
+  if (isSyncEnabled()) {
+    await updateDoc(doc(firestoreDb, "sharedBoards", syncState.roomId, "entries", entryId), {
+      type: nextValues.type,
+      amount: Number(nextValues.amount),
+      currency: nextValues.currency,
+      date: nextValues.date,
+      isInterest: nextValues.type === "income" ? Boolean(nextValues.isInterest) : false,
+      note: nextValues.note
+    });
+    return;
+  }
+
   const entry = state.entries.find((item) => item.id === entryId);
   if (!entry) {
     return;
@@ -526,10 +680,19 @@ function updateEntry(entryId, nextValues) {
   entry.date = nextValues.date;
   entry.isInterest = nextValues.type === "income" ? Boolean(nextValues.isInterest) : false;
   entry.note = nextValues.note;
+  saveState();
+  render();
 }
 
-function deleteEntry(entryId) {
+async function deleteEntry(entryId) {
+  if (isSyncEnabled()) {
+    await deleteDoc(doc(firestoreDb, "sharedBoards", syncState.roomId, "entries", entryId));
+    return;
+  }
+
   state.entries = state.entries.filter((entry) => entry.id !== entryId);
+  saveState();
+  render();
 }
 
 symbolSelect.addEventListener("change", (event) => {
@@ -558,6 +721,30 @@ symbolModal.addEventListener("click", (event) => {
   }
 });
 
+openSyncSettings.addEventListener("click", () => openModal(syncModal));
+closeSyncSettings.addEventListener("click", () => closeModal(syncModal));
+syncModal.addEventListener("click", (event) => {
+  if (event.target.dataset.closeSyncModal === "true") {
+    closeModal(syncModal);
+  }
+});
+
+syncForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await enableSync();
+    closeModal(syncModal);
+  } catch {
+    updateSyncStatus("Firebase-Konfiguration konnte nicht verbunden werden");
+    window.alert("Die Firebase-Konfiguration oder die Familien-ID ist ungueltig.");
+  }
+});
+
+disconnectSyncButton.addEventListener("click", async () => {
+  await disableSync();
+  closeModal(syncModal);
+});
+
 openCurrencySettings.addEventListener("click", () => openModal(currencyModal));
 closeCurrencySettings.addEventListener("click", () => closeModal(currencyModal));
 currencyModal.addEventListener("click", (event) => {
@@ -569,6 +756,7 @@ currencyModal.addEventListener("click", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeModal(symbolModal);
+    closeModal(syncModal);
     closeModal(currencyModal);
     closeModal(entryModal);
   }
@@ -633,9 +821,9 @@ currencyInverseInput.addEventListener("input", () => {
 
 cancelEditButton.addEventListener("click", resetCurrencyForm);
 
-incomeForm.addEventListener("submit", (event) => {
+incomeForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  addEntry(
+  await addEntry(
     "income",
     incomeForm.amount.value,
     incomeForm.currency.value,
@@ -648,15 +836,15 @@ incomeForm.addEventListener("submit", (event) => {
   incomeCurrency.value = state.baseCurrency;
 });
 
-expenseForm.addEventListener("submit", (event) => {
+expenseForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  addEntry("expense", expenseForm.amount.value, expenseForm.currency.value, expenseForm.date.value, expenseForm.note.value);
+  await addEntry("expense", expenseForm.amount.value, expenseForm.currency.value, expenseForm.date.value, expenseForm.note.value);
   expenseForm.reset();
   document.getElementById("expenseDate").value = today;
   expenseCurrency.value = state.baseCurrency;
 });
 
-entryList.addEventListener("click", (event) => {
+entryList.addEventListener("click", async (event) => {
   const editButton = event.target.closest("[data-edit-entry]");
   if (editButton) {
     startEditingEntry(editButton.dataset.editEntry);
@@ -668,18 +856,16 @@ entryList.addEventListener("click", (event) => {
     return;
   }
 
-  deleteEntry(deleteButton.dataset.deleteEntry);
-  saveState();
-  render();
+  await deleteEntry(deleteButton.dataset.deleteEntry);
 });
 
-entryEditForm.addEventListener("submit", (event) => {
+entryEditForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!editingEntryId.value) {
     return;
   }
 
-  updateEntry(editingEntryId.value, {
+  await updateEntry(editingEntryId.value, {
     type: editEntryType.value,
     amount: editEntryAmount.value,
     currency: editEntryCurrency.value,
@@ -687,8 +873,6 @@ entryEditForm.addEventListener("submit", (event) => {
     isInterest: editEntryIsInterest.checked,
     note: editEntryNote.value.trim() || (editEntryType.value === "income" ? "Taschengeld" : "Ausgabe")
   });
-  saveState();
-  render();
   closeModal(entryModal);
 });
 
@@ -699,14 +883,12 @@ editEntryType.addEventListener("change", () => {
   }
 });
 
-deleteEntryButton.addEventListener("click", () => {
+deleteEntryButton.addEventListener("click", async () => {
   if (!editingEntryId.value) {
     return;
   }
 
-  deleteEntry(editingEntryId.value);
-  saveState();
-  render();
+  await deleteEntry(editingEntryId.value);
   closeModal(entryModal);
 });
 
@@ -717,4 +899,20 @@ entryModal.addEventListener("click", (event) => {
   }
 });
 
-render();
+async function bootstrap() {
+  render();
+
+  if (syncState.enabled && syncState.roomId && syncState.configText) {
+    try {
+      const config = JSON.parse(syncState.configText);
+      await connectFirebase(config, syncState.roomId);
+      updateSyncStatus(`Gemeinsam synchronisiert: ${syncState.roomId}`);
+    } catch {
+      syncState.enabled = false;
+      saveSyncSettings();
+      updateSyncStatus("Lokal auf diesem Geraet gespeichert");
+    }
+  }
+}
+
+bootstrap();
