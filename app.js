@@ -92,7 +92,7 @@ const closeSyncSettings = document.getElementById("closeSyncSettings");
 const syncModal = document.getElementById("syncModal");
 const syncForm = document.getElementById("syncForm");
 const syncRoomId = document.getElementById("syncRoomId");
-const firebaseConfigInput = document.getElementById("firebaseConfigInput");
+const syncPasscode = document.getElementById("syncPasscode");
 const disconnectSyncButton = document.getElementById("disconnectSyncButton");
 const syncStatus = document.getElementById("syncStatus");
 
@@ -146,6 +146,7 @@ let firebaseApp = null;
 let firestoreDb = null;
 let firebaseAuth = null;
 let unsubscribeEntries = null;
+let embeddedFirebaseConfig = null;
 
 function normalizeCode(code) {
   return code.trim().toUpperCase();
@@ -186,17 +187,18 @@ function loadSyncSettings() {
   try {
     const raw = localStorage.getItem(SYNC_KEY);
     if (!raw) {
-      return { enabled: false, roomId: "", configText: "" };
+      return { enabled: false, roomId: "", passcode: "", boardKey: "" };
     }
 
     const parsed = JSON.parse(raw);
     return {
       enabled: Boolean(parsed.enabled),
       roomId: parsed.roomId || "",
-      configText: parsed.configText || ""
+      passcode: parsed.passcode || "",
+      boardKey: parsed.boardKey || ""
     };
   } catch {
-    return { enabled: false, roomId: "", configText: "" };
+    return { enabled: false, roomId: "", passcode: "", boardKey: "" };
   }
 }
 
@@ -226,7 +228,7 @@ function ensureStateShape() {
 ensureStateShape();
 
 function isSyncEnabled() {
-  return Boolean(syncState.enabled && firestoreDb && syncState.roomId);
+  return Boolean(syncState.enabled && firestoreDb && syncState.roomId && syncState.boardKey);
 }
 
 function updateSyncStatus(text) {
@@ -453,7 +455,11 @@ function renderEntries() {
 
 function renderSyncInputs() {
   syncRoomId.value = syncState.roomId || "";
-  firebaseConfigInput.value = syncState.configText || "";
+  syncPasscode.value = syncState.passcode || "";
+  if (!embeddedFirebaseConfig) {
+    updateSyncStatus("Firebase-Konfiguration fehlt noch im Projekt");
+    return;
+  }
   updateSyncStatus(isSyncEnabled() ? `Gemeinsam synchronisiert: ${syncState.roomId}` : "Lokal auf diesem Geraet gespeichert");
 }
 
@@ -485,10 +491,33 @@ async function disconnectFirebase() {
   }
 }
 
-async function connectFirebase(config, roomId) {
+async function hashSyncKey(roomId, passcode) {
+  const text = `${roomId}::${passcode}`;
+  const bytes = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function loadEmbeddedFirebaseConfig() {
+  const response = await fetch("./firebase-config.json", { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("config-not-found");
+  }
+
+  const config = await response.json();
+  if (!config.apiKey || !config.authDomain || !config.projectId || !config.appId) {
+    throw new Error("config-invalid");
+  }
+
+  embeddedFirebaseConfig = config;
+}
+
+async function connectFirebase(config, boardKey) {
   await disconnectFirebase();
 
-  const appName = `polds-${roomId}`;
+  const appName = `polds-${boardKey.slice(0, 12)}`;
   const existing = getApps().find((app) => app.name === appName);
   firebaseApp = existing || initializeApp(config, appName);
   firestoreDb = getFirestore(firebaseApp);
@@ -496,7 +525,7 @@ async function connectFirebase(config, roomId) {
   await signInAnonymously(firebaseAuth);
 
   unsubscribeEntries = onSnapshot(
-    collection(firestoreDb, "sharedBoards", roomId, "entries"),
+    collection(firestoreDb, "sharedBoards", boardKey, "entries"),
     (snapshot) => {
       state.entries = snapshot.docs.map((entryDoc) => ({
         id: entryDoc.id,
@@ -510,22 +539,24 @@ async function connectFirebase(config, roomId) {
   );
 }
 
-function getFirebaseConfigFromInput() {
-  const configText = firebaseConfigInput.value.trim();
-  if (!configText) {
-    throw new Error("missing config");
-  }
-  return JSON.parse(configText);
-}
-
 async function enableSync() {
   const roomId = syncRoomId.value.trim();
-  const config = getFirebaseConfigFromInput();
-  await connectFirebase(config, roomId);
+  const passcode = syncPasscode.value.trim();
+  if (!roomId || !passcode) {
+    throw new Error("missing-sync-input");
+  }
+
+  if (!embeddedFirebaseConfig) {
+    throw new Error("missing-embedded-config");
+  }
+
+  const boardKey = await hashSyncKey(roomId, passcode);
+  await connectFirebase(embeddedFirebaseConfig, boardKey);
   syncState = {
     enabled: true,
     roomId,
-    configText: firebaseConfigInput.value.trim()
+    passcode,
+    boardKey
   };
   saveSyncSettings();
   updateSyncStatus(`Gemeinsam synchronisiert: ${roomId}`);
@@ -556,7 +587,7 @@ async function addEntry(type, amount, currency, date, note, isInterest = false) 
   };
 
   if (isSyncEnabled()) {
-    await addDoc(collection(firestoreDb, "sharedBoards", syncState.roomId, "entries"), payload);
+    await addDoc(collection(firestoreDb, "sharedBoards", syncState.boardKey, "entries"), payload);
     return;
   }
 
@@ -656,7 +687,7 @@ function startEditingEntry(entryId) {
 
 async function updateEntry(entryId, nextValues) {
   if (isSyncEnabled()) {
-    await updateDoc(doc(firestoreDb, "sharedBoards", syncState.roomId, "entries", entryId), {
+    await updateDoc(doc(firestoreDb, "sharedBoards", syncState.boardKey, "entries", entryId), {
       type: nextValues.type,
       amount: Number(nextValues.amount),
       currency: nextValues.currency,
@@ -684,7 +715,7 @@ async function updateEntry(entryId, nextValues) {
 
 async function deleteEntry(entryId) {
   if (isSyncEnabled()) {
-    await deleteDoc(doc(firestoreDb, "sharedBoards", syncState.roomId, "entries", entryId));
+    await deleteDoc(doc(firestoreDb, "sharedBoards", syncState.boardKey, "entries", entryId));
     return;
   }
 
@@ -898,12 +929,17 @@ entryModal.addEventListener("click", (event) => {
 });
 
 async function bootstrap() {
+  try {
+    await loadEmbeddedFirebaseConfig();
+  } catch {
+    updateSyncStatus("Firebase-Konfiguration fehlt noch im Projekt");
+  }
+
   render();
 
-  if (syncState.enabled && syncState.roomId && syncState.configText) {
+  if (syncState.enabled && syncState.roomId && syncState.passcode && syncState.boardKey && embeddedFirebaseConfig) {
     try {
-      const config = JSON.parse(syncState.configText);
-      await connectFirebase(config, syncState.roomId);
+      await connectFirebase(embeddedFirebaseConfig, syncState.boardKey);
       updateSyncStatus(`Gemeinsam synchronisiert: ${syncState.roomId}`);
     } catch {
       syncState.enabled = false;

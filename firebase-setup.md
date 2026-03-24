@@ -10,10 +10,12 @@ Ja, du kannst die Firebase-Web-App schon jetzt einrichten.
 2. Neues Projekt anlegen.
 3. Im Projekt eine `Web App` registrieren.
 4. Die Firebase-Konfiguration kopieren.
-5. `Cloud Firestore` aktivieren.
-6. Bei Firestore die Sicherheitsregeln oeffnen.
-7. Den Inhalt aus `firestore.rules` einfuegen.
-8. Regeln veroeffentlichen.
+5. Die Datei `firebase-config.json` im Projekt oeffnen.
+6. Die leeren Werte in `firebase-config.json` mit deiner Firebase-Konfiguration fuellen.
+7. `Cloud Firestore` aktivieren.
+8. Bei Firestore die Sicherheitsregeln oeffnen.
+9. Den Inhalt aus `firestore.rules` einfuegen.
+10. Regeln veroeffentlichen.
 
 ## Firestore-Regeln
 
@@ -24,7 +26,7 @@ Die App meldet sich dafuer automatisch anonym an.
 
 1. In der App auf `Sync` tippen.
 2. Eine Familien-ID eingeben, zum Beispiel `familie-pold`.
-3. Die komplette Firebase-Konfiguration als JSON einfuegen.
+3. Einen kurzen Sync-Code eingeben, zum Beispiel `pold2026`.
 4. `Synchronisation verbinden` tippen.
 
-Alle Geraete mit derselben Familien-ID und derselben Firebase-Konfiguration teilen sich dann dieselben Eintraege.
+Alle Geraete mit derselben Familien-ID und demselben Sync-Code teilen sich dann dieselben Eintraege.

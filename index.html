@@ -22,6 +22,10 @@
         <p class="hero-text">
           Taschengeld eintragen, Ausgaben festhalten und zusammen sehen, wie viel gerade noch da ist.
         </p>
+        <div class="hero-actions">
+          <button id="openSyncSettings" class="ghost-btn settings-button" type="button">Sync</button>
+          <p class="sync-status" id="syncStatus">Lokal auf diesem Geraet gespeichert</p>
+        </div>
       </div>
 
       <div class="symbol-picker">
@@ -44,12 +48,8 @@
           <p class="balance-label">Aktuelles Guthaben</p>
           <p class="balance-value" id="balanceValue">0,00 EUR</p>
         </div>
-        <div class="top-actions">
-          <button id="openSyncSettings" class="ghost-btn settings-button" type="button">Sync</button>
-          <button id="openCurrencySettings" class="ghost-btn settings-button" type="button">Waehrungen</button>
-        </div>
+        <button id="openCurrencySettings" class="ghost-btn settings-button" type="button">Waehrungen</button>
       </div>
-      <p class="sync-status" id="syncStatus">Lokal auf diesem Geraet gespeichert</p>
       <div class="balance-stats">
         <article>
           <span>Einnahmen</span>
@@ -218,11 +218,11 @@
           <input id="syncRoomId" type="text" maxlength="40" placeholder="z. B. familie-pold" required>
         </label>
         <label>
-          Firebase-Konfiguration als JSON
-          <textarea id="firebaseConfigInput" rows="8" placeholder='{"apiKey":"...","authDomain":"...","projectId":"..."}' required></textarea>
+          Sync-Code
+          <input id="syncPasscode" type="password" maxlength="40" placeholder="z. B. pold2026" required>
         </label>
         <p class="helper-text">
-          Alle Geraete mit derselben Familien-ID und derselben Firebase-Konfiguration sehen dieselben Eintraege.
+          Alle Geraete mit derselben Familien-ID und demselben Sync-Code sehen dieselben Eintraege.
         </p>
         <div class="form-actions">
           <button type="submit" class="ghost-btn wide-btn">Synchronisation verbinden</button>
